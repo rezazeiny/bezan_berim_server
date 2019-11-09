@@ -1,2 +1,2 @@
-# bezan_berim
-بزن بریم
+# bezan_berim_server
+using Django framework for server
