@@ -1,0 +1,6 @@
+kavenegar
+django-cors-headers
+django
+djangorestframework
+markdown
+django-filter
