@@ -1,13 +1,16 @@
 import base64
 import random
 import string
+import sys
 
 from Utils.config import *
 from django.core.files.base import ContentFile
 from kavenegar import *
 
 
-def send_pattern(template, token, receptor=CREATOR_PHONE, token2=None, print_debug=False):
+def send_pattern(template, token, receptor=CREATOR_PHONE, token2=None, token3=None, print_debug=False):
+    if print_debug:
+        print("Sending SMS to " + receptor, file=sys.stderr)
     try:
         api = KavenegarAPI(KAVENEGAR_API)
         params = {
@@ -18,13 +21,17 @@ def send_pattern(template, token, receptor=CREATOR_PHONE, token2=None, print_deb
         }
         if token2:
             params['token2'] = token2
+        if token3:
+            params['token3'] = token3
         response = api.verify_lookup(params)
         if print_debug:
+            print("Sent SMS to " + receptor, file=sys.stderr)
             print(response)
         return True
 
     except Exception as e:
         if print_debug:
+            print("Error in sending SMS to " + receptor, file=sys.stderr)
             print(e)
         return False
 
@@ -52,10 +59,11 @@ def id_generator(size=65, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 
-def make_output(error_code=0, error_text=""):
+def make_output(result_code=0, error_text=""):
     return {
-        'error_code': error_code,
-        'error_text': error_text
+        'result_code': result_code,
+        'error_text': error_text,
+        # 'cache_time': time.time()
     }
 
 

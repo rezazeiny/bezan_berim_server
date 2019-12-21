@@ -30,6 +30,7 @@ urlpatterns = [
         'document_root': settings.MEDIA_ROOT,
     }),
     path('user/', include('user.urls')),
+    path('group/', include('group.urls')),
     # path('app/', include('app.urls')),
 ]
 
