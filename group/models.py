@@ -34,7 +34,7 @@ class Transaction(models.Model):
 class Group(models.Model):
     # id = models.BigIntegerField(primary_key=True, blank=False, unique=True)
     chat_id = models.BigIntegerField(default=0, blank=False)
-    chat_block = models.BooleanField(default=False)
+    # chat_block = models.BooleanField(default=False)
     message_id = models.BigIntegerField(default=0, blank=False)
     # invite = models.BooleanField(default=False)
     admin = models.ForeignKey(User, on_delete=models.CASCADE, blank=False)

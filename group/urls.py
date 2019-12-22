@@ -7,13 +7,11 @@ urlpatterns = [
     path('add/', views.GroupAdd.as_view()),
     path('list/', views.GroupList.as_view()),
     path('check/', views.GroupCheck.as_view()),
-    path('detail/', views.GroupDetail.as_view()),
-    # path('member/', views.GroupMember.as_view()),
-    path('transaction/', views.GroupTransaction.as_view()),
-    path('change_invite/', views.ChangeInvite.as_view()),
-    path('add_member/', views.AddMember.as_view()),
-
-    path('change/chat/', views.GroupChangeID.as_view()),
+    path('change_chat_id/', views.GroupChangeChatID.as_view()),
+    path('join/', views.GroupJoin.as_view()),
+    path('left/', views.GroupLeft.as_view()),
+    path('members/', views.GroupMembers.as_view()),
+    path('transactions/', views.GroupTransactions.as_view()),
 ]
 
 if settings.DEBUG:

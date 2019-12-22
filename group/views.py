@@ -108,7 +108,6 @@ def get_group_data(data, group=None, has_member=False, has_transaction=False):
     output["invite"] = group.invite
     # output["delete"] = group.delete
     output["chat_id"] = group.chat_id
-    output["chat_block"] = group.chat_block
     output["register_date"] = group.register_date
     output["admin"] = {"name": group.admin.name, "id": group.admin.id}
     output["member_len"] = len(members)
@@ -158,9 +157,25 @@ class GroupAdd(generics.CreateAPIView):
         if user is None:
             return Response(make_output(10, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
         # todo set limitation for a person add group
-        group = Group.objects.create(name=data['name'], admin=user)
-        group.members.create(user=user)
-        group.save()
+        if data["group_id"] == 0:
+            group = Group.objects.create(name=data['name'], admin=user)
+            group.members.create(user=user)
+            group.save()
+        else:
+            group = Group.objects.filter(id=data["group_id"])
+            if len(group) == 0:
+                return Response(make_output(20, "group not exist"), status=status.HTTP_406_NOT_ACCEPTABLE)
+            group = group[0]
+            if group.delete:
+                return Response(make_output(21, "deleted group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+            member = GroupMember.objects.filter(group=group, user=user)
+            if len(member) == 0:
+                return Response(make_output(22, "group and user not match"), status=status.HTTP_406_NOT_ACCEPTABLE)
+            member = member[0]
+            if member.delete:
+                return Response(make_output(23, "left group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+            group.name = data["name"]
+            group.save()
         output = get_user_data(user)
         output["group_id"] = group.id
         return Response(output, status=status.HTTP_200_OK)
@@ -218,89 +233,184 @@ class GroupCheck(generics.CreateAPIView):
         output["remain"] = member.remain
         output["id"] = group.id
         output["name"] = group.name
+        output["message_id"] = group.message_id
         output["chat_id"] = group.chat_id
-        output["chat_block"] = group.chat_block
         output["member_len"] = group.members.count()
         output["transaction_len"] = group.transactions.count()
         output["admin"] = {"id": group.admin.id, "name": group.admin.name}
+        output["user"] = {"id": user.id, "name": user.name}
         return Response(output, status=status.HTTP_200_OK)
 
 
-class GroupDetail(generics.CreateAPIView):
+class GroupChangeChatID(generics.CreateAPIView):
     serializer_class = GroupSerializerEmpty
 
     def create(self, request, *args, **kwargs):
         data = request.data
         user = check_user_id(data)
         if user is None:
-            return Response(make_output(1, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
-        return Response(get_group_data(data), status=status.HTTP_200_OK)
-
-
-class GroupTransaction(generics.CreateAPIView):
-    serializer_class = GroupSerializerEmpty
-
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        user = check_user_id(data)
-        if user is None:
-            return Response(make_output(1, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
-        return Response(get_group_data(data, has_transaction=True), status=status.HTTP_200_OK)
-
-
-# class GroupMember(generics.CreateAPIView):
-#     serializer_class = GroupSerializerEmpty
-#
-#     def create(self, request, *args, **kwargs):
-#         data = request.data
-#         user = check_user_id(data)
-#         if user is None:
-#             return Response(make_output(1, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
-#         return Response(get_group_data(data, has_member=True), status=status.HTTP_200_OK)
-
-
-class ChangeInvite(generics.CreateAPIView):
-    serializer_class = GroupSerializerEmpty
-
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        user = check_user_id(data)
-        if user is None:
-            return Response(make_output(1, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
-        group = check_group_id_admin(data)
-        if group in None:
-            return Response(make_output(2, "Not valid group"), status=status.HTTP_406_NOT_ACCEPTABLE)
-        group.invite = data["invite"]
-        group.save()
-        return Response(get_group_data(data, group=group, has_member=True), status=status.HTTP_200_OK)
-
-
-class AddMember(generics.CreateAPIView):
-    serializer_class = GroupSerializerEmpty
-
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        group = get_groups_data(data)
-        if group in None:
-            return Response(make_output(2, "Not valid group"), status=status.HTTP_406_NOT_ACCEPTABLE)
-        member = check_user_id(data, data["member"])
-        if member is None:
-            return Response(make_output(3, "Not valid member"), status=status.HTTP_406_NOT_ACCEPTABLE)
-        group_member = check_group_id_user()
-        group.invite = data["invite"]
-        group.save()
-        return Response(get_group_data(data, group=group, has_member=True), status=status.HTTP_200_OK)
-
-
-class GroupChangeID(generics.CreateAPIView):
-    serializer_class = GroupSerializerEmpty
-
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        group = check_group_id_admin(data)
-        if not group:
-            return Response(make_output(1, "Auth Error"), status=status.HTTP_406_NOT_ACCEPTABLE)
+            return Response(make_output(10, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = Group.objects.filter(id=data["group_id"])
+        if len(group) == 0:
+            return Response(make_output(20, "group not exist"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = group[0]
+        if group.delete:
+            return Response(make_output(21, "deleted group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = GroupMember.objects.filter(group=group, user=user)
+        if len(member) == 0:
+            return Response(make_output(22, "group and user not match"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = member[0]
+        if member.delete:
+            return Response(make_output(23, "left group"), status=status.HTTP_406_NOT_ACCEPTABLE)
         group.chat_id = data["chat_id"]
-        group.chat_block = False
+        group.message_id = data["message_id"]
         group.save()
         return Response(make_output(), status=status.HTTP_200_OK)
+
+
+class GroupJoin(generics.CreateAPIView):
+    serializer_class = GroupSerializerEmpty
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        user = check_user_id(data)
+        if user is None:
+            return Response(make_output(10, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = Group.objects.filter(id=data["group_id"])
+        if len(group) == 0:
+            return Response(make_output(20, "group not exist"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = group[0]
+        if group.delete:
+            return Response(make_output(21, "deleted group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = GroupMember.objects.filter(group=group, user=user)
+        if len(member) == 1 and not member[0].delete:
+            return Response(make_output(25, "you are in group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        if len(member) == 1 and member[0].delete:
+            output = make_output(26, "you was in group")
+            member[0].delete = False
+            member[0].save()
+            output["id"] = group.id
+            output["name"] = group.name
+            output["chat_id"] = group.chat_id
+            output["user"] = {"id": user.id, "name": user.name}
+            return Response(output, status=status.HTTP_406_NOT_ACCEPTABLE)
+        group.members.create(user=user)
+        group.save()
+        output = make_output()
+        output["id"] = group.id
+        output["name"] = group.name
+        output["user"] = {"id": user.id, "name": user.name}
+        output["chat_id"] = group.chat_id
+        return Response(output, status=status.HTTP_200_OK)
+
+
+class GroupLeft(generics.CreateAPIView):
+    serializer_class = GroupSerializerEmpty
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        user = check_user_id(data)
+        if user is None:
+            return Response(make_output(10, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = Group.objects.filter(id=data["group_id"])
+        if len(group) == 0:
+            return Response(make_output(20, "group not exist"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = group[0]
+        if group.delete:
+            return Response(make_output(21, "deleted group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = GroupMember.objects.filter(group=group, user=user)
+        if len(member) == 0:
+            return Response(make_output(22, "group and user not match"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = member[0]
+        if member.delete:
+            return Response(make_output(23, "left group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        if data["user_id"] == group.admin.id:
+            group.delete = True
+            group.save()
+        else:
+            member.delete = True
+            member.save()
+        return Response(make_output(), status=status.HTTP_200_OK)
+
+
+class GroupMembers(generics.CreateAPIView):
+    serializer_class = GroupSerializerEmpty
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        user = check_user_id(data)
+        if user is None:
+            return Response(make_output(10, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = Group.objects.filter(id=data["group_id"])
+        if len(group) == 0:
+            return Response(make_output(20, "group not exist"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = group[0]
+        if group.delete:
+            return Response(make_output(21, "deleted group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = GroupMember.objects.filter(group=group, user=user)
+        if len(member) == 0:
+            return Response(make_output(22, "group and user not match"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = member[0]
+        if member.delete:
+            return Response(make_output(23, "left group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        output = make_output()
+        members = group.members.all()
+        output["member_list"] = []
+        is_admin = data["user_id"] == group.admin.id
+        for i in range(len(members)):
+            member = members[i]
+            if is_admin or not member.delete:
+                output["member_list"].append({
+                    "user": {"name": member.user.name, "id": member.user.id},
+                    "remain": member.remain,
+                    "delete": member.delete,
+                    "register_date": member.register_date,
+                    "selected": False,
+                })
+        return Response(output, status=status.HTTP_200_OK)
+
+
+class GroupTransactions(generics.CreateAPIView):
+    serializer_class = GroupSerializerEmpty
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        user = check_user_id(data)
+        if user is None:
+            return Response(make_output(10, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = Group.objects.filter(id=data["group_id"])
+        if len(group) == 0:
+            return Response(make_output(20, "group not exist"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = group[0]
+        if group.delete:
+            return Response(make_output(21, "deleted group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = GroupMember.objects.filter(group=group, user=user)
+        if len(member) == 0:
+            return Response(make_output(22, "group and user not match"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = member[0]
+        if member.delete:
+            return Response(make_output(23, "left group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        output = make_output()
+        transactions = group.transactions.all()
+        output["transaction_list"] = []
+        is_admin = data["user_id"] == group.admin.id
+        for i in range(len(transactions)):
+            transaction = transactions[i]
+            if is_admin or not transaction.delete:
+                transaction_members = []
+                all_member = transaction.members.all()
+                for j in range(len(all_member)):
+                    member = all_member[j]
+                    transaction_members.append({
+                        "user": {"name": member.user.name, "id": member.user.id},
+                        "contribution": member.contribution,
+                    })
+                output["transaction_list"].append({
+                    "user": {"name": transaction.user.name, "id": transaction.user.id},
+                    "cost": transaction.cost,
+                    "member_len": len(transaction_members),
+                    "member": transaction_members,
+                    "delete": transaction.delete,
+                    "register_date": transaction.register_date,
+                })
+        return Response(output, status=status.HTTP_200_OK)
