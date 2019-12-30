@@ -17,5 +17,5 @@ class UserSerializerList(serializers.ModelSerializer):
 class UserSerializerDetail(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'name', 'email', 'email_random', 'email_validation', 'phone_number', 'phone_random',
-                  'phone_validation', 'register_data')
+        fields = ('id', 'name', 'phone_number', 'phone_random',
+                  'phone_validation', 'register_date')
