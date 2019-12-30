@@ -28,6 +28,9 @@ ALLOWED_HOSTS = [
     'localhost'
 ]
 
+if DEBUG:
+    ALLOWED_HOSTS.append('*')
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -89,7 +92,7 @@ if not DEBUG:
     }
 
 # Database
-# https://docs.djangoproject.com/en/2.2/ref/settings/#databases
+# https://docdjangoproject.com/en/2.2/ref/settings/#databases
 
 DATABASES = {
     'default': {
@@ -137,11 +140,3 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
-
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_HOST_USER = 'rezazeiny1998@gmail.com'
-EMAIL_HOST_PASSWORD = 'luqscmourqrhprjw'
-DEFAULT_FROM_EMAIL = 'Reza Zeiny'
-
-EMAIL_USE_TLS = True
