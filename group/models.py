@@ -17,7 +17,7 @@ class TransactionMember(models.Model):
     contribution = models.BigIntegerField(default=0, blank=False)
 
     def __str__(self):
-        return self.user.id
+        return str(self.user.id)
 
 
 class Transaction(models.Model):
@@ -28,7 +28,7 @@ class Transaction(models.Model):
     delete = models.BooleanField(default=False)
 
     def __str__(self):
-        return self.user.id
+        return str(self.user.id)
 
 
 class Group(models.Model):

@@ -414,3 +414,56 @@ class GroupTransactions(generics.CreateAPIView):
                     "register_date": transaction.register_date,
                 })
         return Response(output, status=status.HTTP_200_OK)
+
+
+class GroupAddTransaction(generics.CreateAPIView):
+    serializer_class = GroupSerializerEmpty
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        print(data)
+        user = check_user_id(data)
+        if user is None:
+            return Response(make_output(10, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = Group.objects.filter(id=data["group_id"])
+        if len(group) == 0:
+            return Response(make_output(20, "group not exist"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = group[0]
+        if group.delete:
+            return Response(make_output(21, "deleted group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = GroupMember.objects.filter(group=group, user=user)
+        if len(member) == 0:
+            return Response(make_output(22, "group and user not match"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = member[0]
+        if member.delete:
+            return Response(make_output(23, "left group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        print("A")
+        n1 = User.objects.get(id=data["user_id"])
+        group = Group.objects.get(id=data['group_id'])
+        # group.transactions.clear()
+        # for i in range(len(group.members.all())):
+        #     group.members.all()[i].remain = 0
+        #     group.members.all()[i].save()
+        t1 = group.transactions.create(cost=data["cost"], user=n1)
+        m = GroupMember.objects.get(user=n1, group=group)
+        m.remain += data["cost"]
+        print(m.user.name, data["cost"])
+        m.save()
+        for member in data["member_list"]:
+            m = GroupMember.objects.get(user_id=int(member), group=group)
+            t1.members.create(user=m.user, contribution=int(data["cost"] / len(data["member_list"])))
+            if member == data["member_list"][-1]:
+                print(m.user.name, data["cost"] - (int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1)),m.remain)
+                m.remain -= data["cost"] - (int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1))
+                print(m.user.name, data["cost"] - (int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1)),m.remain)
+                m.save()
+                continue
+            print(m.user.name,int(data["cost"] / len(data["member_list"])),m.remain)
+
+            m.remain -= int(data["cost"] / len(data["member_list"]))
+            print(m.user.name,int(data["cost"] / len(data["member_list"])),m.remain)
+
+            m.save()
+        t1.save()
+
+        return Response(make_output(), status=status.HTTP_200_OK)
