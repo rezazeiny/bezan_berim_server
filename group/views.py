@@ -5,10 +5,10 @@ from rest_framework import generics
 from rest_framework import status
 from rest_framework.response import Response
 
-from user.views import check_user_id, get_user_data
-from .serializers import *
 from Utils.server_utils import *
 from group.models import *
+from user.views import check_user_id, get_user_data
+from .serializers import *
 
 
 def check_group_id(data, user_id=0):
@@ -412,8 +412,42 @@ class GroupTransactions(generics.CreateAPIView):
                     "member": transaction_members,
                     "delete": transaction.delete,
                     "register_date": transaction.register_date,
+                    "id": transaction.id
                 })
         return Response(output, status=status.HTTP_200_OK)
+
+
+class GroupDeleteTransaction(generics.CreateAPIView):
+    serializer_class = GroupSerializerEmpty
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        print(data)
+        user = check_user_id(data)
+        if user is None:
+            return Response(make_output(10, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = Group.objects.filter(id=data["group_id"])
+        if len(group) == 0:
+            return Response(make_output(20, "group not exist"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = group[0]
+        if group.delete:
+            return Response(make_output(21, "deleted group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = GroupMember.objects.filter(group=group, user=user)
+        if len(member) == 0:
+            return Response(make_output(22, "group and user not match"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = member[0]
+        if member.delete:
+            return Response(make_output(23, "left group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        transaction = group.transactions.get(id=data["transaction_id"])
+        t_member = GroupMember.objects.filter(group=group, user=transaction.user)
+        t_member[0].remain -= transaction.cost
+        t_member[0].save()
+        for i in range(transaction.members.count()):
+            t_member = GroupMember.objects.filter(group=group, user=transaction.members.all()[i].user)
+            t_member[0].remain += transaction.members.all()[i].contribution
+            t_member[0].save()
+        transaction.delete = True
+        transaction.save()
 
 
 class GroupAddTransaction(generics.CreateAPIView):
@@ -453,15 +487,20 @@ class GroupAddTransaction(generics.CreateAPIView):
             m = GroupMember.objects.get(user_id=int(member), group=group)
             t1.members.create(user=m.user, contribution=int(data["cost"] / len(data["member_list"])))
             if member == data["member_list"][-1]:
-                print(m.user.name, data["cost"] - (int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1)),m.remain)
-                m.remain -= data["cost"] - (int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1))
-                print(m.user.name, data["cost"] - (int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1)),m.remain)
+                print(m.user.name,
+                      data["cost"] - (int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1)),
+                      m.remain)
+                m.remain -= data["cost"] - (
+                        int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1))
+                print(m.user.name,
+                      data["cost"] - (int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1)),
+                      m.remain)
                 m.save()
                 continue
-            print(m.user.name,int(data["cost"] / len(data["member_list"])),m.remain)
+            print(m.user.name, int(data["cost"] / len(data["member_list"])), m.remain)
 
             m.remain -= int(data["cost"] / len(data["member_list"]))
-            print(m.user.name,int(data["cost"] / len(data["member_list"])),m.remain)
+            print(m.user.name, int(data["cost"] / len(data["member_list"])), m.remain)
 
             m.save()
         t1.save()

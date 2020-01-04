@@ -13,6 +13,7 @@ urlpatterns = [
     path('members/', views.GroupMembers.as_view()),
     path('transactions/', views.GroupTransactions.as_view()),
     path('transaction/', views.GroupAddTransaction.as_view()),
+    path('del_transaction/', views.GroupDeleteTransaction.as_view()),
 ]
 
 if settings.DEBUG:
