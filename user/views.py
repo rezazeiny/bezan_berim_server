@@ -100,7 +100,7 @@ class UserPhoneSend(generics.CreateAPIView):
         if user.phone_validation == "":
             return Response(make_output(12, "Phone not found"), status=status.HTTP_406_NOT_ACCEPTABLE)
         user.phone_random = id_generator(6, string.digits)
-        # send_pattern("bezzanberim", user.phone_random, user.phone_validation, print_debug=True)
+        send_pattern("bezzanberim", user.phone_random, user.phone_validation, print_debug=True)
         # todo: repair this
         user.save()
         return Response(get_user_data(user), status=status.HTTP_200_OK)
@@ -114,8 +114,8 @@ class UserPhoneValidate(generics.CreateAPIView):
         user = check_user_id(data)
         if not user:
             return Response(make_output(10, "Unknown ID"), status=status.HTTP_406_NOT_ACCEPTABLE)
-        # if user.phone_random != data['phone_random']:
-        #     return Response(make_output(13, "Not match code."), status=status.HTTP_406_NOT_ACCEPTABLE)
+        if user.phone_random != data['phone_random']:
+            return Response(make_output(13, "Not match code."), status=status.HTTP_406_NOT_ACCEPTABLE)
         # todo: repair this
         user.phone_number = user.phone_validation
         user.phone_validation = ""
