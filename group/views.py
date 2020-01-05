@@ -5,147 +5,10 @@ from rest_framework import generics
 from rest_framework import status
 from rest_framework.response import Response
 
-from Utils.server_utils import *
-from group.models import *
 from user.views import check_user_id, get_user_data
 from .serializers import *
-
-
-def check_group_id(data, user_id=0):
-    print(data, file=sys.stderr)
-    # if group_id == 0:
-    #     group_id = data["group_id"]
-    # group = Group.objects.filter(id=group_id)
-    # if len(group) == 1:
-    #     return group[0]
-    # else:
-    return None
-
-
-def check_group_id_admin(data, group_id=0, user_id=0):
-    print(data, file=sys.stderr)
-    if group_id == 0:
-        group_id = data["group_id"]
-    if user_id == 0:
-        user_id = data["user_id"]
-    group = Group.objects.filter(id=group_id, admin__id=user_id)
-    if len(group) == 1:
-        return group[0]
-    else:
-        return None
-
-
-def check_group_id_user(data, group_id=0, user_id=0):
-    print(data, file=sys.stderr)
-    if group_id == 0:
-        group_id = data["group_id"]
-    if user_id == 0:
-        user_id = data["user_id"]
-    group = Group.objects.filter(id=group_id, members__user__id=user_id)
-    if len(group) == 1:
-        return group[0]
-    else:
-        return None
-
-
-def get_groups_data(data, group_id=0, user_id=0):
-    print(data, file=sys.stderr)
-    if group_id == 0:
-        group_id = data["group_id"]
-    if user_id == 0:
-        user_id = data["user_id"]
-    output = make_output()
-    groups = Group.objects.filter(members__user__id=user_id)
-    output["group_list"] = []
-    output["group_id"] = group_id
-    output["remain"] = 0
-    for group in groups:
-        if group.delete:
-            continue
-        members = group.members.all()
-        remain = 0
-        for i in range(len(members)):
-            member = members[i]
-            if member.user.id == data["user_id"]:
-                remain = member.remain
-                output["remain"] += remain
-                break
-        output["group_list"].append({
-            "name": group.name,
-            "id": group.id,
-            "members": len(group.members.all()),
-            # "delete": group.delete,
-            "admin": {"name": group.admin.name, "id": group.admin.id},
-            "remain": remain
-        })
-    return output
-
-
-def get_group_data(data, group=None, has_member=False, has_transaction=False):
-    print(data, file=sys.stderr)
-    output = make_output()
-    if not group:
-        # group = Group.objects.filter(id=data["group_id"], members__user__id=data["user_id"])
-        group = Group.objects.filter(id=data["group_id"])
-        if len(group) == 0:
-            return make_output(20, "group not exist")
-        group = group[0]
-    if group.delete:
-        return make_output(21, "deleted group")
-    members = group.members.all()
-    transactions = group.transactions.all()
-    output["remain"] = 0
-    for i in range(len(members)):
-        member = members[i]
-        if member.user.id == data["user_id"]:
-            output["remain"] = member.remain
-            if member.delete:
-                return make_output(4, "left group")
-            break
-    is_admin = data["user_id"] == group.admin.id
-    output["name"] = group.name
-    output["id"] = group.id
-    output["invite"] = group.invite
-    # output["delete"] = group.delete
-    output["chat_id"] = group.chat_id
-    output["register_date"] = group.register_date
-    output["admin"] = {"name": group.admin.name, "id": group.admin.id}
-    output["member_len"] = len(members)
-    output["transaction_len"] = len(transactions)
-
-    if has_member:
-        output["member_list"] = []
-        for i in range(len(members)):
-            member = members[i]
-            if is_admin or not member.delete:
-                output["member_list"].append({
-                    "user": {"name": member.user.name, "id": member.user.id},
-                    "remain": member.remain,
-                    "delete": member.delete,
-                    "register_date": member.register_date,
-                })
-    if has_transaction:
-        output["transaction_list"] = []
-        for i in range(len(transactions)):
-            transaction = transactions[i]
-            if is_admin or not transaction.delete:
-                transaction_members = []
-                all_member = transaction.members.all()
-                for j in range(len(all_member)):
-                    member = all_member[j]
-                    transaction_members.append({
-                        "user": {"name": member.user.name, "id": member.user.id},
-                        "contribution": member.contribution,
-                    })
-                output["transaction_list"].append({
-                    "user": {"name": transaction.user.name, "id": transaction.user.id},
-                    "cost": transaction.cost,
-                    "member_len": len(transaction_members),
-                    "member": transaction_members,
-                    "delete": transaction.delete,
-                    "register_date": transaction.register_date,
-                })
-    return output
+from Utils.server_utils import *
+from group.models import *
 
 
 class GroupAdd(generics.CreateAPIView):
@@ -304,6 +167,40 @@ class GroupJoin(generics.CreateAPIView):
         return Response(output, status=status.HTTP_200_OK)
 
 
+class GroupReopen(generics.CreateAPIView):
+    serializer_class = GroupSerializerEmpty
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        user = check_user_id(data)
+        if user is None:
+            return Response(make_output(10, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = Group.objects.filter(id=data["group_id"])
+        if len(group) == 0:
+            return Response(make_output(20, "group not exist"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        group = group[0]
+        if group.delete:
+            return Response(make_output(21, "deleted group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        if group.admin.id != data["user_id"]:
+            return Response(make_output(26, "you are not admin of this group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = GroupMember.objects.filter(group=group, user=data["member_id"])
+        if len(member) == 0:
+            return Response(make_output(27, "this id not in group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member = member[0]
+        if data["delete"] and member.delete:
+            return Response(make_output(28, "this member was deleted"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        if not data["delete"] and not member.delete:
+            return Response(make_output(29, "this member was in group"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        member.delete = data["delete"]
+        member.save()
+        output = make_output()
+        output["id"] = group.id
+        output["name"] = group.name
+        output["user"] = {"id": user.id, "name": user.name}
+        output["chat_id"] = group.chat_id
+        return Response(output, status=status.HTTP_200_OK)
+
+
 class GroupLeft(generics.CreateAPIView):
     serializer_class = GroupSerializerEmpty
 
@@ -439,15 +336,28 @@ class GroupDeleteTransaction(generics.CreateAPIView):
         if member.delete:
             return Response(make_output(23, "left group"), status=status.HTTP_406_NOT_ACCEPTABLE)
         transaction = group.transactions.get(id=data["transaction_id"])
-        t_member = GroupMember.objects.filter(group=group, user=transaction.user)
-        t_member[0].remain -= transaction.cost
-        t_member[0].save()
+        if transaction.delete:
+            return Response(make_output(29, "transaction was deleted"), status=status.HTTP_406_NOT_ACCEPTABLE)
+        # print(transaction)
+        t_member = GroupMember.objects.get(group=group, user=transaction.user)
+        # print(t_member)
+        # print(t_member.remain, transaction.cost, transaction.delete)
+        t_member.remain -= transaction.cost
+        # print(t_member.remain, transaction.cost, transaction.delete)
+        t_member.save()
+        # print(t_member.remain)
+        # print(transaction.members.count())
         for i in range(transaction.members.count()):
-            t_member = GroupMember.objects.filter(group=group, user=transaction.members.all()[i].user)
-            t_member[0].remain += transaction.members.all()[i].contribution
-            t_member[0].save()
+            t_member = GroupMember.objects.get(group=group, user=transaction.members.all()[i].user)
+            # print(t_member)
+            # print(t_member.remain, transaction.members.all()[i].contribution)
+            t_member.remain += transaction.members.all()[i].contribution
+            # print(t_member.remain, transaction.members.all()[i].contribution)
+            t_member.save()
+            # print(t_member.remain)
         transaction.delete = True
         transaction.save()
+        return Response(make_output(), status=status.HTTP_200_OK)
 
 
 class GroupAddTransaction(generics.CreateAPIView):
@@ -455,7 +365,7 @@ class GroupAddTransaction(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         data = request.data
-        print(data)
+        # print(data)
         user = check_user_id(data)
         if user is None:
             return Response(make_output(10, "Not valid user"), status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -471,7 +381,7 @@ class GroupAddTransaction(generics.CreateAPIView):
         member = member[0]
         if member.delete:
             return Response(make_output(23, "left group"), status=status.HTTP_406_NOT_ACCEPTABLE)
-        print("A")
+        # print("A")
         n1 = User.objects.get(id=data["user_id"])
         group = Group.objects.get(id=data['group_id'])
         # group.transactions.clear()
@@ -481,26 +391,26 @@ class GroupAddTransaction(generics.CreateAPIView):
         t1 = group.transactions.create(cost=data["cost"], user=n1)
         m = GroupMember.objects.get(user=n1, group=group)
         m.remain += data["cost"]
-        print(m.user.name, data["cost"])
+        # print(m.user.name, data["cost"])
         m.save()
         for member in data["member_list"]:
             m = GroupMember.objects.get(user_id=int(member), group=group)
             t1.members.create(user=m.user, contribution=int(data["cost"] / len(data["member_list"])))
             if member == data["member_list"][-1]:
-                print(m.user.name,
-                      data["cost"] - (int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1)),
-                      m.remain)
+                # print(m.user.name,
+                #       data["cost"] - (int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1)),
+                #       m.remain)
                 m.remain -= data["cost"] - (
                         int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1))
-                print(m.user.name,
-                      data["cost"] - (int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1)),
-                      m.remain)
+                # print(m.user.name,
+                #       data["cost"] - (int(data["cost"] / len(data["member_list"])) * (len(data["member_list"]) - 1)),
+                #       m.remain)
                 m.save()
                 continue
-            print(m.user.name, int(data["cost"] / len(data["member_list"])), m.remain)
+            # print(m.user.name, int(data["cost"] / len(data["member_list"])), m.remain)
 
             m.remain -= int(data["cost"] / len(data["member_list"]))
-            print(m.user.name, int(data["cost"] / len(data["member_list"])), m.remain)
+            # print(m.user.name, int(data["cost"] / len(data["member_list"])), m.remain)
 
             m.save()
         t1.save()

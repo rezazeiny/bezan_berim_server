@@ -5,7 +5,7 @@ from django.conf import settings
 
 
 urlpatterns = [
-    # path('check/', views.UserCheckByID.as_view()),
+    path('add/', views.PlaceAdd.as_view()),
 ]
 
 if settings.DEBUG:

@@ -7,6 +7,7 @@ urlpatterns = [
     path('add/', views.GroupAdd.as_view()),
     path('list/', views.GroupList.as_view()),
     path('check/', views.GroupCheck.as_view()),
+    path('reopen/', views.GroupReopen.as_view()),
     path('change_chat_id/', views.GroupChangeChatID.as_view()),
     path('join/', views.GroupJoin.as_view()),
     path('left/', views.GroupLeft.as_view()),
